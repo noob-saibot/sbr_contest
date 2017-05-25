@@ -1,9 +1,13 @@
 import pandas as pd
-from sklearn.model_selection import train_test_split, cross_val_score, learning_curve
+from sklearn.model_selection import train_test_split, cross_val_score, learning_curve, cross_val_predict
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import ExtraTreesRegressor
+from sklearn.svm import LinearSVR, SVR
 from sklearn.metrics import make_scorer
 from sklearn.model_selection import ShuffleSplit
+from xgboost import XGBRegressor
+import xgbfir
+import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -60,15 +64,43 @@ def main():
 
     dx, dxt, dy, dyt = train_test_split(df_train.drop(['price_doc'], axis=1), df_train.price_doc, test_size=.2)
 
-    model = LinearRegression(normalize=True)
-    #model = ExtraTreesRegressor()
+    # model = LinearRegression(normalize=True)
+    model = ExtraTreesRegressor()
+    drop_tmp_list = ['max_floor','full_sq', 'material',
+                     'num_room', 'floor', 'build_year',
+                     'area_m', ]
 
-    title = "Learning Curves"
-    cv = ShuffleSplit(n_splits=100, test_size=0.2, random_state=0)
-    plot_learning_curve(model, title, dx, dy, cv=cv, n_jobs=3)
+    features_list = []
+    crossvall = cross_val_score(model, dx[drop_tmp_list], dy, cv=1000, scoring=rmsle_est).mean()
+    print('Before: ', crossvall)
+    for name in dx.drop(['id'] + drop_tmp_list, axis=1).columns:
+        model.fit(dx, dy)
+        crossvall = cross_val_score(model, dx[[name] + drop_tmp_list], dy, cv=1000, scoring=rmsle_est).mean()
+        print(name, crossvall)
+        features_list.append((name, crossvall))
+        pickle.dump(features_list, open('feature_statistic', 'wb'))
+        # print(cross_val_predict(model, dx, ))
+        # print('test: ', rmsle(dyt, model.predict(dxt)))
 
-    plt.show()
+    # model = XGBRegressor(n_estimators=1000, subsample=0.7, max_depth=3)
+    #model = SVR()
 
+    # import xgbfir
+    # xgb_cmodel = XGBRegressor(n_estimators=3000, subsample=0.7, max_depth=2).fit(dx, dy)
+    # #print(help(XGBRegressor().fit))
+    #
+    # print(rmsle(dy, xgb_cmodel.predict(dx)))
+    # print(rmsle(dyt, xgb_cmodel.predict(dxt)))
+    # xgbfir.saveXgbFI(xgb_cmodel, OutputXlsxFile='features.xlsx')
+    # exit()
+
+    # title = "Learning Curves"
+    # cv = ShuffleSplit(n_splits=10, test_size=0.2)
+    # plot_learning_curve(model, title, dx, dy, cv=cv, n_jobs=4)
+    #
+    # plt.show()
+
+    exit()
     #model.fit(dx, dy)
 
     pred = model.predict(dx)
